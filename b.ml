@@ -199,15 +199,15 @@ struct
     try
       (match Env.lookup e x with
       | Addr l -> l
-      | Proc _ -> raise (Error "not allowed")) 
-    with Env.Not_bound -> raise (Error "not bound")
+      | Proc _ -> raise (Error "env_loc : not allowed")) 
+    with Env.Not_bound -> raise (Error "env_loc : not bound")
 
   let env_proc e f =
     try
       (match Env.lookup e f with
-        | Addr _ -> raise (Error "not allowed") 
+        | Addr _ -> raise (Error "env_proc : not allowed") 
       | Proc (id, exp, env) -> (id, exp, env))
-    with Env.Not_bound -> raise (Error "not bound")
+    with Env.Not_bound -> raise (Error "env_proc : not bound")
       
   let rec eval : memory -> env -> exp -> (value * memory) = 
     fun mem env e -> match e with
@@ -328,7 +328,7 @@ struct
           (match (Mem.alloc mem1) with
             | (loc, mem2) ->
               (match (Env.bind env x (Addr loc)) with
-                | env1 -> eval (Mem.store mem2 (env_loc env1 x) v1) env1 e2)))        
+                | env1 -> eval (Mem.store mem2 loc v1) env1 e2)))        
     | LETF (f, xlist, e1, e2) -> 
       (match (Env.bind env f (Proc (xlist, e1, env))) with
         | env1 -> eval mem env1 e2)
@@ -342,16 +342,16 @@ struct
         in (match (evalList elist [] mem) with
             | (vlist1, mem2) ->
               (match (env_proc env f) with
-                | (xlist, e1, env) ->
+                | (xlist, e1, env1) ->
                   let rec bindetox bvlist bxlist benv bmem =
                     (match bvlist with
                       | ([]) -> 
                         (match bxlist with
                           | ([]) -> eval bmem benv e1
-                          | (xhd::xtl) -> raise (Error "Wrong Parameter"))
+                          | (xhd::xtl) -> raise (Error "CALLV : Wrong Parameter"))
                       | (hd::tl) ->
                         (match bxlist with
-                          | ([]) -> raise (Error "Wrong Parameter")
+                          | ([]) -> raise (Error "CALLV : Wrong Parameter")
                           | (xhd::xtl) -> 
                             (match (Mem.alloc bmem) with 
                               | (loc, bmem1) -> 
@@ -359,8 +359,25 @@ struct
                                   | env1 -> 
                                     (match (Mem.store bmem1 loc hd) with
                                       | bmem2 -> bindetox tl xtl env1 bmem2)))))
-                  in bindetox vlist1 xlist env mem2))
-    | CALLR (f, xlist) -> raise (Error "fuck")
+                  in bindetox vlist1 xlist env1 mem2))
+    | CALLR (f, vlist) -> 
+      (match (env_proc env f) with
+       | (xlist, e1, env1) ->
+          let rec bindvtox bvlist bxlist benv bmem =
+           (match bvlist with
+            | ([]) -> 
+              (match bxlist with
+                | ([]) -> 
+                  (match Env.bind benv f (Proc (xlist, e1,  benv)) with
+                    | benv1 -> eval bmem benv1 e1)
+                | (xhd::xtl) -> raise (Error "CALLR : Wrong Parameter"))
+            | (vhd::vtl) ->
+              (match bxlist with 
+                | ([]) -> raise (Error "CALLR : Wrong Paramter")
+                | (xhd::xtl) -> 
+                  (match Env.bind benv xhd (Addr (env_loc env vhd)) with
+                    | env2 -> bindvtox vtl xtl env2 bmem)))
+          in bindvtox vlist xlist env1 mem)
     | RECORD xexplist ->  raise (Error "fuck")
     | FIELD (e1, x) -> raise (Error "fuck")
     | ASSIGN (x, e1) -> 
