@@ -331,6 +331,19 @@ struct
       (match (Env.bind env f (Proc (xlist, e1, env)))
         | env1 -> eval mem env1 e2)
     | CALLV (f, elist) -> 
+      (match (env_proc env f) with
+        | Proc(xlist, e1, env) -> 
+          (match elist with ->
+           | (hd::tl) -> 
+             (match (eval mem env1 hd) with
+              | (v1, mem2) -> 
+                (match xlist with ->
+                | (xhd::xtl) -> )))
+
+
+
+
+
     | CALLR (f, xlist) ->
     | RECORD xexplist -> 
     | FIELD (e1, x) ->
@@ -356,4 +369,5 @@ struct
   let run (mem, env, pgm) = 
     let (v,_) = eval mem env pgm in
     v
+
 end
