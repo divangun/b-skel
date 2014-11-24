@@ -77,6 +77,8 @@ struct
   let bind (E(env)) id loc = E(fun x -> if x = id then loc else env x)
 end
 
+
+
 (*
  * B Interpreter
  *)
@@ -328,28 +330,42 @@ struct
               (match (Env.bind env x (Addr loc)) with
                 | env1 -> eval (Mem.store mem2 (env_loc env1 x) v1) env1 e2)))        
     | LETF (f, xlist, e1, e2) -> 
-      (match (Env.bind env f (Proc (xlist, e1, env)))
+      (match (Env.bind env f (Proc (xlist, e1, env))) with
         | env1 -> eval mem env1 e2)
     | CALLV (f, elist) -> 
-      (match (env_proc env f) with
-        | Proc(xlist, e1, env) -> 
-          (match elist with ->
-           | (hd::tl) -> 
-             (match (eval mem env1 hd) with
-              | (v1, mem2) -> 
-                (match xlist with ->
-                | (xhd::xtl) -> )))
-
-
-
-
-
-    | CALLR (f, xlist) ->
-    | RECORD xexplist -> 
-    | FIELD (e1, x) ->
-    | ASSIGN (x, e1) ->
-        (match (eval mem env e1) with
-          | (v1, mem1) ->  (v1, Mem.store mem1 (env_loc env x) v1 ))
+        let rec evalList elist vlist mem1=
+          (match elist with
+            | ([]) -> (vlist, mem)
+            | (hd::tl) -> 
+              (match (eval mem env hd) with
+                | (v1, mem1) -> evalList tl (vlist@[v1]) mem1))
+        in (match (evalList elist [] mem) with
+            | (vlist1, mem2) ->
+              (match (env_proc env f) with
+                | (xlist, e1, env) ->
+                  let rec bindetox bvlist bxlist benv bmem =
+                    (match bvlist with
+                      | ([]) -> 
+                        (match bxlist with
+                          | ([]) -> eval bmem benv e1
+                          | (xhd::xtl) -> raise (Error "Wrong Parameter"))
+                      | (hd::tl) ->
+                        (match bxlist with
+                          | ([]) -> raise (Error "Wrong Parameter")
+                          | (xhd::xtl) -> 
+                            (match (Mem.alloc bmem) with 
+                              | (loc, bmem1) -> 
+                                (match Env.bind benv xhd (Addr loc) with
+                                  | env1 -> 
+                                    (match (Mem.store bmem1 loc hd) with
+                                      | bmem2 -> bindetox tl xtl env1 bmem2)))))
+                  in bindetox vlist1 xlist env mem2))
+    | CALLR (f, xlist) -> raise (Error "fuck")
+    | RECORD xexplist ->  raise (Error "fuck")
+    | FIELD (e1, x) -> raise (Error "fuck")
+    | ASSIGN (x, e1) -> 
+      (match (eval mem env e1) with
+        | (v1, mem1) ->  (v1, Mem.store mem1 (env_loc env x) v1 ))
 (*)    | ASSIGNF (e1, x, e2) -> *)
     | READ x ->
       let n = read_int () in
@@ -370,4 +386,9 @@ struct
     let (v,_) = eval mem env pgm in
     v
 
+
 end
+
+
+(*fun x -> if x = id then loc else Not_bound
+fun x -> if x = id2 then loc2 else if x = id then loc else Not_bound*)
