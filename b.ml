@@ -347,7 +347,9 @@ struct
                     (match bvlist with
                       | ([]) -> 
                         (match bxlist with
-                          | ([]) -> eval bmem benv e1
+                          | ([]) -> 
+                            (match Env.bind benv f (Proc (xlist, e1, benv)) with
+                              | benv1 -> eval bmem benv1 e1)
                           | (xhd::xtl) -> raise (Error "CALLV : Wrong Parameter"))
                       | (hd::tl) ->
                         (match bxlist with
@@ -378,12 +380,43 @@ struct
                   (match Env.bind benv xhd (Addr (env_loc env vhd)) with
                     | env2 -> bindvtox vtl xtl env2 bmem)))
           in bindvtox vlist xlist env1 mem)
-    | RECORD xexplist ->  raise (Error "fuck")
-    | FIELD (e1, x) -> raise (Error "fuck")
+    | RECORD xexplist -> 
+        let rec evalList elist vlist mem1=
+          (match elist with
+            | ([]) -> (vlist, mem)
+            | (hd::tl) -> 
+              (match (eval mem env hd) with
+                | (v1, mem1) -> evalList tl (vlist@[v1]) mem1))
+        in (match (evalList (List.map snd xexplist) [] mem) with
+            | (vlist1, mem1) ->
+                let rec bindvtorx bvlist bxlist bmem brecord = 
+                  (match bvlist with
+                  | ([]) -> 
+                    (match bxlist with
+                     | ([]) -> (Record brecord, bmem)
+                     | (xid,xval)::xtl -> raise (Error "RECORD : HEHE"))
+                  | (vhd::vtl) ->
+                    (match bxlist with
+                    | ([]) -> raise (Error "RECORD : HEHE")
+                    | (xid, xval)::xtl -> 
+                      (match (Mem.alloc mem1) with                         
+                        | (loc, mem2) -> 
+                          (match (Mem.store mem2 loc vhd) with
+                          | mem3 -> bindvtorx vtl xtl mem3 (fun x->if x=xid then loc else brecord x)))))
+                in bindvtorx vlist1 xexplist mem1 (fun x-> raise (Error "RECORD :  Not Bound" )))
+    | FIELD (e1, x) -> 
+      (match (eval mem env e1) with
+        | (Record r1, mem1) -> (Mem.load mem1 (r1 x), mem1)
+        | (_,_) -> raise (Error "FILED : Expected record type of value, but other type supplied"))
     | ASSIGN (x, e1) -> 
       (match (eval mem env e1) with
         | (v1, mem1) ->  (v1, Mem.store mem1 (env_loc env x) v1 ))
-(*)    | ASSIGNF (e1, x, e2) -> *)
+    | ASSIGNF (e1, x, e2) -> 
+        (match (eval mem env e1) with
+          | (Record r1, mem1) ->
+            (match (eval mem1 env e2) with
+              | (v1, mem2) -> (v1, Mem.store mem2 (r1 x) v1))
+          | (_,_) -> raise (Error "FILED : Expected record type of value, but other type supplied"))
     | READ x ->
       let n = read_int () in
       (Num n, Mem.store mem (env_loc env x) (Num n))
